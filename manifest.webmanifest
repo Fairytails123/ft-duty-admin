@@ -1,0 +1,13 @@
+{
+  "name": "Fairy Tails Duty Admin",
+  "short_name": "Duty Admin",
+  "description": "Manage the Fairy Tails day-care duty rota, reminders and staff.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f766e",
+  "theme_color": "#0f766e",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

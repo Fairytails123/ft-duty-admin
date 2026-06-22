@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fairy Tails — Duty Admin</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">🐾</span><span>Duty Admin</span></div>
+  <button id="signout" class="ghost small" hidden>Sign out</button>
+</header>
+
+<main>
+  <section id="gate" hidden>
+    <div class="card narrow">
+      <h1>Duty Admin</h1>
+      <p class="muted">Enter the admin access token to manage the rota, reminders and staff.</p>
+      <label for="token">Admin token</label>
+      <input id="token" type="password" autocomplete="current-password" placeholder="Paste your token">
+      <p></p>
+      <button id="enter" class="primary" style="width:100%">Continue</button>
+      <p id="gateErr" class="error" hidden></p>
+    </div>
+  </section>
+
+  <section id="main" hidden>
+    <nav class="tabs">
+      <button data-tab="rota" class="tab active">Rota</button>
+      <button data-tab="reminders" class="tab">Reminders</button>
+      <button data-tab="staff" class="tab">Staff</button>
+    </nav>
+
+    <div id="tab-rota" class="panel">
+      <div class="row spread">
+        <h2>Weekly rota</h2>
+        <div class="weeknav">
+          <button id="weekPrev" class="ghost small" title="Previous week">‹</button>
+          <input id="week" type="date">
+          <button id="weekNext" class="ghost small" title="Next week">›</button>
+        </div>
+      </div>
+      <p class="muted small">Week commencing (Monday). Set each person's shift pattern for the week, then save.</p>
+      <div id="rotaList" class="list"></div>
+      <button id="saveRota" class="primary">Save rota</button>
+    </div>
+
+    <div id="tab-reminders" class="panel" hidden>
+      <div class="row spread"><h2>Reminders</h2><button id="addRem" class="primary small">+ Add reminder</button></div>
+      <p class="note">⚠️ After adding a reminder at a <b>new time of day</b>, the system owner must add a matching schedule in n8n, or it won't fire. Editing the message/days/windows of an existing time works immediately.</p>
+      <div id="remList" class="list"></div>
+    </div>
+
+    <div id="tab-staff" class="panel" hidden>
+      <h2>Staff</h2>
+      <p class="muted small">Names and roles. Telegram chat IDs are captured automatically when staff tap their onboarding link.</p>
+      <div id="staffList" class="list"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+<script src="./app.js"></script>
+</body>
+</html>
