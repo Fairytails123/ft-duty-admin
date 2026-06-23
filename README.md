@@ -8,7 +8,7 @@ A small vanilla-JS PWA to manage the day-care duty **rota**, **reminders** and *
   derived Google Sheet (`FT Duty Reminders`). The site never holds Google credentials.
 - Access is gated by an **admin token** you enter once (stored in `localStorage`, sent to the API on each request).
 - API endpoint: `POST https://ftmanager.app.n8n.cloud/webhook/ft-duty-admin`
-  body `{ token, action, payload }`, actions: `bootstrap`, `saveRota`, `saveReminder`, `saveStaff`, `saveRiskDog`.
+  body `{ token, action, payload }`, actions: `bootstrap`, `saveRota`, `saveReminder`, `saveStaff`, `saveRiskDog`, `syncSchedule`.
 
 ## Tabs
 - **Rota** — pick a week (Monday) and set each active staff member's shift pattern; Save.
@@ -17,9 +17,11 @@ A small vanilla-JS PWA to manage the day-care duty **rota**, **reminders** and *
   Chat IDs are captured automatically when staff tap their link (onboarding only sets the chat_id, never `active`).
 - **Risk Dogs** — list risk-assessed dogs (`dog_name`, *In today*, risk notes). A reminder with condition `dog:<name>` fires only on days that dog is ticked **In today** — e.g. a muzzling reminder.
 
-## Note on new reminder *times*
-The engine fires from per-time schedules in n8n. Editing an existing reminder's content takes effect
-immediately, but a reminder at a **brand-new time of day** also needs a matching schedule added in n8n.
+## Reminder *times* → engine schedule (Sync button)
+The engine fires from per-time cron rules in n8n. Editing an existing reminder's content takes effect
+immediately. After adding or removing a reminder **time**, click **Sync schedule to n8n** on the Reminders
+tab: the Admin API rebuilds the engine's Schedule Trigger from the distinct active reminder times (via the
+n8n public API) and re-activates it — no manual n8n editing. The button shows the active times it will push.
 
 ## Changing the admin token
 Edit the `Auth` node in the n8n "FT Duty Reminders - Admin API" workflow, then re-enter the new token in the site.

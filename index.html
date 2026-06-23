@@ -53,7 +53,13 @@
 
     <div id="tab-reminders" class="panel" hidden>
       <div class="row spread"><h2>Reminders</h2><button id="addRem" class="primary small">+ Add reminder</button></div>
-      <p class="note">⚠️ After adding a reminder at a <b>new time of day</b>, the system owner must add a matching schedule in n8n, or it won't fire. Editing the message/days/windows of an existing time works immediately.</p>
+      <div class="note">
+        <div class="row spread" style="align-items:center;gap:.5rem">
+          <div><b>Engine schedule</b><div id="syncStatus" class="muted small">…</div></div>
+          <button id="syncSched" class="primary small">Sync schedule to n8n</button>
+        </div>
+        <p class="muted small" style="margin:.4rem 0 0">Content edits (message, days, windows) apply immediately. After adding or removing a reminder <b>time</b>, tap <b>Sync schedule</b> so n8n fires at the new times.</p>
+      </div>
       <div id="remList" class="list"></div>
     </div>
 

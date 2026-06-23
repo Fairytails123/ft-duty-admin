@@ -228,10 +228,44 @@ function remCard(r) {
   );
 }
 function renderReminders() {
+  renderSyncStatus();
   const wrap = $('#remList'); wrap.innerHTML = '';
   const list = state.data.reminders || [];
   if (!list.length) { wrap.append(el('p', { className: 'muted' }, 'No reminders yet — add one.')); return; }
   list.forEach(r => wrap.append(remCard(r)));
+}
+// Distinct HH:MM of active reminders — what the engine schedule should fire at.
+function distinctActiveTimes() {
+  const set = {};
+  (state.data.reminders || []).forEach(r => {
+    if (String(r.active).toLowerCase() !== 'y') return;
+    const pp = String(r.time || '').trim().split(':');
+    if (pp.length < 2) return;
+    const h = parseInt(pp[0], 10), mi = parseInt(pp[1], 10);
+    if (isNaN(h) || isNaN(mi)) return;
+    set[(h < 10 ? '0' + h : '' + h) + ':' + (mi < 10 ? '0' + mi : '' + mi)] = true;
+  });
+  return Object.keys(set).sort();
+}
+function renderSyncStatus() {
+  const box = $('#syncStatus'); if (!box) return;
+  const times = distinctActiveTimes();
+  box.textContent = times.length ? ('Active times: ' + times.join(', ')) : 'No active reminders.';
+}
+// Push the distinct active reminder times to n8n's engine cron (Approach B — manual button).
+async function syncSchedule() {
+  const btn = $('#syncSched'); const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Syncing…';
+  try {
+    const r = await api('syncSchedule', {});
+    if (r && r.ok) {
+      const n = r.count || 0, times = (r.times || []).join(', ');
+      if (r.no_active) toast('No active reminders — engine schedule left unchanged.');
+      else if (r.changed === false) toast('Already in sync — ' + n + ' time' + (n === 1 ? '' : 's') + (times ? ' (' + times + ')' : '') + '.');
+      else toast('Schedule synced — ' + n + ' time' + (n === 1 ? '' : 's') + (times ? ' (' + times + ')' : '') + '.');
+    } else { toast('Sync failed', true); }
+  } catch (e) { if (e.message !== 'unauthorized') toast('Sync failed — check n8n', true); }
+  finally { btn.disabled = false; btn.textContent = label; }
 }
 
 // ---------- Staff ----------
@@ -305,6 +339,7 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#signout').onclick = () => signOut();
   $('#saveRota').onclick = saveRota;
   $('#addRem').onclick = () => $('#remList').prepend(remCard());
+  $('#syncSched').onclick = syncSchedule;
   $('#addRisk').onclick = () => $('#riskList').prepend(riskCard());
   $('#weekPrev').onclick = () => shiftWeek(-7);
   $('#weekNext').onclick = () => shiftWeek(7);
