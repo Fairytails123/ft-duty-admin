@@ -48,8 +48,15 @@ function renderAll() { renderRota(); renderReminders(); renderStaff(); renderRis
 
 // ---------- Rota ----------
 function activeStaff() { return (state.data.staff || []).filter(s => String(s.active).toLowerCase() === 'y'); }
+function shortPatternLabel(p) {
+  // The staff name/role is already shown on the row; drop the redundant role prefix
+  // ("Core - 07:45 start" -> "07:45 start", "Groomer - AM cover" -> "AM cover").
+  const lbl = String(p.label || p.pattern_id || '');
+  const i = lbl.indexOf(' - ');
+  return i > -1 ? lbl.slice(i + 3) : lbl;
+}
 function patternOptions() {
-  const ps = (state.data.patterns || []).map(p => ({ id: p.pattern_id, label: p.label || p.pattern_id }));
+  const ps = (state.data.patterns || []).map(p => ({ id: p.pattern_id, label: shortPatternLabel(p) }));
   if (!ps.some(p => p.id === 'off')) ps.push({ id: 'off', label: 'Off / not on duty' });
   return ps;
 }
