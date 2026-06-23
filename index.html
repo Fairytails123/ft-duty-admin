@@ -34,6 +34,7 @@
       <button data-tab="rota" class="tab active">Rota</button>
       <button data-tab="reminders" class="tab">Reminders</button>
       <button data-tab="staff" class="tab">Staff</button>
+      <button data-tab="riskdogs" class="tab">Risk Dogs</button>
     </nav>
 
     <div id="tab-rota" class="panel">
@@ -60,6 +61,12 @@
       <h2>Staff</h2>
       <p class="muted small">Names and roles. Telegram chat IDs are captured automatically when staff tap their onboarding link.</p>
       <div id="staffList" class="list"></div>
+    </div>
+
+    <div id="tab-riskdogs" class="panel" hidden>
+      <div class="row spread"><h2>Risk dogs</h2><button id="addRisk" class="primary small">+ Add dog</button></div>
+      <p class="muted small">Risk-assessed dogs. Tick <b>In today</b> on the days a dog is in. A reminder whose condition is <code>dog:&lt;name&gt;</code> only fires on days that dog is marked in.</p>
+      <div id="riskList" class="list"></div>
     </div>
   </section>
 </main>

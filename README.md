@@ -8,13 +8,14 @@ A small vanilla-JS PWA to manage the day-care duty **rota**, **reminders** and *
   derived Google Sheet (`FT Duty Reminders`). The site never holds Google credentials.
 - Access is gated by an **admin token** you enter once (stored in `localStorage`, sent to the API on each request).
 - API endpoint: `POST https://ftmanager.app.n8n.cloud/webhook/ft-duty-admin`
-  body `{ token, action, payload }`, actions: `bootstrap`, `saveRota`, `saveReminder`, `saveStaff`.
+  body `{ token, action, payload }`, actions: `bootstrap`, `saveRota`, `saveReminder`, `saveStaff`, `saveRiskDog`.
 
 ## Tabs
 - **Rota** — pick a week (Monday) and set each active staff member's shift pattern; Save.
-- **Reminders** — add/edit reminders (title, message, time, days, "requires Done", done-window, active).
+- **Reminders** — add/edit reminders (title, message, time, days, "requires Done", done-window, active) **plus a Conditions builder**: dropdowns/checkboxes that gate firing on *who's on duty* (role/person/pattern/count), *date* (day-of-month/nth-weekday/specific date/last-working-day), and *dog in today*. Composes the `condition` string the engine evaluates (`onduty:` / `date:` / `dog:`, `;`-joined = AND).
 - **Staff** — edit names/roles/active; copy each person's onboarding link (`t.me/FTDuties_bot?start=<staff_id>`).
-  Chat IDs are captured automatically when staff tap their link.
+  Chat IDs are captured automatically when staff tap their link (onboarding only sets the chat_id, never `active`).
+- **Risk Dogs** — list risk-assessed dogs (`dog_name`, *In today*, risk notes). A reminder with condition `dog:<name>` fires only on days that dog is ticked **In today** — e.g. a muzzling reminder.
 
 ## Note on new reminder *times*
 The engine fires from per-time schedules in n8n. Editing an existing reminder's content takes effect
