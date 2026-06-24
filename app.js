@@ -21,7 +21,7 @@ function toast(msg, isErr) { const t = $('#toast'); t.textContent = msg; t.class
 async function api(action, payload) {
   const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: state.token, action, payload: payload || {} }) });
   let json; try { json = await res.json(); } catch (e) { json = {}; }
-  if (json && json.ok === false && json.error === 'unauthorized') { signOut('Token rejected — please re-enter.'); throw new Error('unauthorized'); }
+  if (json && json.ok === false && json.error === 'unauthorized') { signOut("That token wasn't accepted. Check it and try again."); throw new Error('unauthorized'); }
   return json;
 }
 
@@ -32,7 +32,17 @@ function showGate() { $('#gate').hidden = false; $('#main').hidden = true; $('#s
 function showMain() { $('#gate').hidden = true; $('#main').hidden = false; $('#signout').hidden = false; }
 function signOut(msg) { state.token = ''; localStorage.removeItem(TOKEN_KEY); showGate(); if (msg) { const e = $('#gateErr'); e.textContent = msg; e.hidden = false; } }
 
-async function boot() {
+function setGateBusy(busy) {
+  const btn = $('#enter'), st = $('#gateStatus'), tok = $('#token');
+  if (btn) { btn.disabled = busy; btn.textContent = busy ? 'Checking…' : 'Continue'; }
+  if (tok) tok.disabled = busy;
+  if (st) { st.textContent = 'Checking your token…'; st.hidden = !busy; }
+}
+// Single sign-in path with visible feedback (button "Checking…", spinner, distinct error messages).
+async function doSignIn(tok) {
+  const err = $('#gateErr'); if (err) err.hidden = true;
+  state.token = tok; localStorage.setItem(TOKEN_KEY, tok);
+  setGateBusy(true);
   try {
     const r = await api('bootstrap');
     if (!r || r.ok !== true) throw new Error('bad');
@@ -41,7 +51,19 @@ async function boot() {
     if (!state.week) state.week = ymd(mondayOf(new Date()));
     $('#week').value = state.week;
     renderAll();
-  } catch (e) { if (e.message !== 'unauthorized') signOut('Could not connect. Check the token and try again.'); }
+  } catch (e) {
+    // 'unauthorized' already surfaced its own message via api() -> signOut(); only handle other failures here.
+    if (e.message !== 'unauthorized') { showGate(); if (err) { err.textContent = "Couldn't reach the server — check your connection and try again."; err.hidden = false; } }
+    const t = $('#token'); if (t) { t.focus(); t.select(); }
+  } finally {
+    setGateBusy(false);
+  }
+}
+function signInFromForm() {
+  const v = $('#token').value.trim();
+  const err = $('#gateErr');
+  if (!v) { err.textContent = 'Please enter the admin token.'; err.hidden = false; $('#token').focus(); return; }
+  doSignIn(v);
 }
 async function refresh() { const r = await api('bootstrap'); if (r && r.ok) { state.data = r; renderAll(); } }
 function renderAll() { renderRota(); renderReminders(); renderStaff(); renderRiskDogs(); }
@@ -416,8 +438,8 @@ function shiftWeek(days) { const d = new Date(state.week + 'T12:00:00'); d.setDa
 
 window.addEventListener('DOMContentLoaded', () => {
   setupTabs();
-  $('#enter').onclick = () => { const v = $('#token').value.trim(); if (!v) return; state.token = v; localStorage.setItem(TOKEN_KEY, v); $('#gateErr').hidden = true; boot(); };
-  $('#token').addEventListener('keydown', e => { if (e.key === 'Enter') $('#enter').click(); });
+  $('#enter').onclick = signInFromForm;
+  $('#token').addEventListener('keydown', e => { if (e.key === 'Enter') signInFromForm(); });
   $('#signout').onclick = () => signOut();
   $('#saveRota').onclick = saveRota;
   $('#addRem').onclick = () => $('#remList').prepend(remCard());
@@ -429,5 +451,6 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#printRota').onclick = () => window.print();
   window.addEventListener('beforeunload', e => { if (state.data && rotaDirty()) { e.preventDefault(); e.returnValue = ''; } });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
-  if (state.token) boot(); else showGate();
+  showGate();
+  if (state.token) doSignIn(state.token);
 });

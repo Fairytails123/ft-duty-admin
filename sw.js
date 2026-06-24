@@ -1,5 +1,5 @@
 // Minimal app-shell service worker. Same-origin shell only; the n8n API (cross-origin) is never cached.
-const CACHE = 'ft-duty-admin-v4';
+const CACHE = 'ft-duty-admin-v5';
 const SHELL = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {

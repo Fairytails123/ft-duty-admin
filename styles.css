@@ -88,6 +88,10 @@ details.archived .card{opacity:.85}
 .roster-row.off{opacity:.6}
 .roster-row.off .r-pat{font-weight:400;color:var(--muted)}
 @media(max-width:560px){ .roster-row{grid-template-columns:1fr auto} .roster-row .r-role{display:none} }
+/* Sign-in "checking" status + spinner */
+.gate-status{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px}
+.gate-status::before{content:'';width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 /* Print: isolate the saved-rota panel */
 @media print{
   body *{visibility:hidden}
