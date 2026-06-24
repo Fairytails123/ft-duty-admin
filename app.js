@@ -266,7 +266,7 @@ function parseDays(spec) {
   return out;
 }
 function remCard(r, archived) {
-  r = r || { reminder_id: '', title: '', message: '', time: '', days: 'Mon-Fri', condition: '', requires_done: 'n', done_window_mins: '30', active: 'y' };
+  r = r || { reminder_id: '', title: '', message: '', time: '', days: 'Mon-Fri', condition: '', requires_done: 'n', done_window_mins: '30', active: 'y', exclude_staff: '' };
   archived = !!archived;
   const title = el('input', { value: r.title || '', placeholder: 'e.g. Lunchtime medication check' });
   const msg = el('textarea', { value: r.message || '', placeholder: 'Message sent to staff', rows: 2 });
@@ -276,11 +276,18 @@ function remCard(r, archived) {
   const sel = new Set(parseDays(r.days)); const boxes = {};
   DAYS.forEach(d => { const cb = el('input', { type: 'checkbox', checked: sel.has(d) }); boxes[d] = cb; dayWrap.append(el('label', { className: 'chip' }, cb, d)); });
   const reqd = el('input', { type: 'checkbox', checked: String(r.requires_done).toLowerCase() === 'y' });
+  // Per-reminder recipients: all on-duty staff by default; uncheck to exclude. Stored as exclude list.
+  const cardStaff = activeStaff();
+  const exSet = new Set(String(r.exclude_staff || '').split(',').map(x => x.trim()).filter(Boolean));
+  const staffWrap = el('div', { className: 'days' });
+  const staffBoxes = {};
+  cardStaff.forEach(s => { const cb = el('input', { type: 'checkbox', checked: !exSet.has(s.staff_id) }); staffBoxes[s.staff_id] = cb; staffWrap.append(el('label', { className: 'chip' }, cb, s.name || s.staff_id)); });
   const cond = conditionBuilder(r.condition || '');
   // Read this card's live on-screen values (shared by Save / Archive / Duplicate).
   function collect() {
     const days = DAYS.filter(d => boxes[d].checked).join(',');
-    return { reminder_id: r.reminder_id, title: title.value.trim(), message: msg.value.trim(), time: time.value, days, condition: cond.serialize(), requires_done: reqd.checked ? 'y' : 'n', done_window_mins: String(dwin.value || '30') };
+    const exclude_staff = cardStaff.filter(s => !staffBoxes[s.staff_id].checked).map(s => s.staff_id).join(',');
+    return { reminder_id: r.reminder_id, title: title.value.trim(), message: msg.value.trim(), time: time.value, days, condition: cond.serialize(), requires_done: reqd.checked ? 'y' : 'n', done_window_mins: String(dwin.value || '30'), exclude_staff };
   }
   async function save(activeVal, btn) {
     const payload = collect(); payload.active = activeVal;
@@ -299,6 +306,7 @@ function remCard(r, archived) {
     el('div', { className: 'rem-row' },
       el('div', null, el('div', { className: 'lbl' }, 'Days'), dayWrap),
       el('label', { className: 'switch' }, reqd, el('span', null, 'Requires "Done"'))),
+    cardStaff.length ? el('div', { className: 'sendto' }, el('div', { className: 'lbl' }, 'Send to (on-duty staff only — uncheck to skip someone)'), staffWrap) : null,
     cond.wrap,
     el('div', { className: 'row spread' }, el('span', { className: 'muted small' }, r.reminder_id || '(new)'), el('div', { className: 'row' }, dup, arch, saveBtn))
   );
