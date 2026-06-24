@@ -65,3 +65,33 @@ button:disabled{opacity:.5;cursor:default}
 .cond-val{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 code{background:#f1f5f9;border:1px solid var(--line);border-radius:6px;padding:1px 5px;font-size:12px}
 @media(max-width:560px){ .rem-grid{grid-template-columns:1fr 1fr} .item .sel{max-width:150px} }
+/* Saved-state badge */
+.saverow{gap:12px;margin-top:4px}
+.savebadge{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.savebadge.saved{background:#dcfce7;color:var(--ok)}
+.savebadge.dirty{background:var(--warnbg);color:var(--warn)}
+/* Archived (hidden) cards */
+details.archived{margin-top:14px;border-top:1px dashed var(--line);padding-top:10px}
+details.archived>summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600}
+details.archived[open]>summary{margin-bottom:10px}
+details.archived .card{opacity:.85}
+/* Saved-rota print panel */
+.rota-panel{margin-top:16px;background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px}
+.rota-panel .panel-head{margin-bottom:8px}
+.roster{display:flex;flex-direction:column}
+.roster-row{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.roster-row:first-child{border-top:0}
+.roster-row .r-name{font-weight:600}
+.roster-row .r-role{color:var(--muted);font-size:13px}
+.roster-row .r-pat{font-weight:600}
+.roster-row .r-time{color:var(--muted);font-size:13px;text-align:right}
+.roster-row.off{opacity:.6}
+.roster-row.off .r-pat{font-weight:400;color:var(--muted)}
+@media(max-width:560px){ .roster-row{grid-template-columns:1fr auto} .roster-row .r-role{display:none} }
+/* Print: isolate the saved-rota panel */
+@media print{
+  body *{visibility:hidden}
+  #rotaPanel,#rotaPanel *{visibility:visible}
+  #rotaPanel{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;margin:0;padding:0}
+  .no-print{display:none !important}
+}

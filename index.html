@@ -48,7 +48,17 @@
       </div>
       <p class="muted small">Week commencing (Monday). Set each person's shift pattern for the week, then save.</p>
       <div id="rotaList" class="list"></div>
-      <button id="saveRota" class="primary">Save rota</button>
+      <div class="row saverow">
+        <button id="saveRota" class="primary">Save rota</button>
+        <span id="rotaStatus" class="savebadge"></span>
+      </div>
+      <section id="rotaPanel" class="rota-panel">
+        <div class="row spread panel-head">
+          <div><b>Saved rota</b> <span id="rotaPanelWeek" class="muted small"></span></div>
+          <button id="printRota" class="ghost small no-print">🖨 Print</button>
+        </div>
+        <div id="rotaPrintBody"></div>
+      </section>
     </div>
 
     <div id="tab-reminders" class="panel" hidden>

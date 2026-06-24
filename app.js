@@ -61,17 +61,66 @@ function patternOptions() {
   return ps;
 }
 function rotaFor(week) { const m = {}; (state.data.rota || []).filter(r => String(r.week_commencing) === week).forEach(r => { m[r.staff_id] = r.pattern_id; }); return m; }
+function patternById() { const m = {}; (state.data.patterns || []).forEach(p => { m[p.pattern_id] = p; }); return m; }
 function renderRota() {
   const wrap = $('#rotaList'); wrap.innerHTML = '';
   const assigned = rotaFor(state.week);
   const opts = patternOptions();
   const staff = activeStaff();
-  if (!staff.length) { wrap.append(el('p', { className: 'muted' }, 'No active staff yet.')); return; }
-  staff.forEach(s => {
+  if (!staff.length) { wrap.append(el('p', { className: 'muted' }, 'No active staff yet.')); }
+  else staff.forEach(s => {
     const sel = el('select', { className: 'sel' }); sel.dataset.staff = s.staff_id;
     opts.forEach(o => { const op = el('option', { value: o.id }, o.label); if ((assigned[s.staff_id] || 'off') === o.id) op.selected = true; sel.append(op); });
+    sel.onchange = updateRotaStatus;
     wrap.append(el('div', { className: 'item' }, el('div', { className: 'item-main' }, el('strong', null, s.name || s.staff_id), el('span', { className: 'muted small' }, s.staff_id)), sel));
   });
+  updateRotaStatus();
+  renderRotaPanel();
+}
+// Saved-state badge: compare on-screen selects vs the saved rota for this week (missing => 'off').
+function rotaDirty() {
+  if (!state.data) return false;
+  const saved = rotaFor(state.week);
+  const sels = $$('#rotaList select');
+  if (!sels.length) return false;
+  return sels.some(sel => sel.value !== (saved[sel.dataset.staff] || 'off'));
+}
+function updateRotaStatus() {
+  const b = $('#rotaStatus'); if (!b) return;
+  if (rotaDirty()) { b.textContent = '● Unsaved changes'; b.className = 'savebadge dirty'; }
+  else { b.textContent = '✓ Saved'; b.className = 'savebadge saved'; }
+}
+function guardLeaveWeek() { return !rotaDirty() || confirm('You have unsaved rota changes for week ' + state.week + '. Discard them and switch week?'); }
+// Read-only printable roster for the SAVED rota of the selected week (one week only).
+function fmtRange(p) { const a = String(p && p.daycare_start || '').trim(), b = String(p && p.daycare_end || '').trim(); return (a && b) ? (a + '–' + b) : ''; }
+function weekSpanLabel(wk) {
+  const pp = String(wk).split('-'); if (pp.length !== 3) return wk;
+  const y = +pp[0], m = +pp[1], d = +pp[2];
+  const mon = new Date(y, m - 1, d), sun = new Date(y, m - 1, d + 6); // local dates, +6 = Sunday
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return 'w/c ' + DOW[mon.getDay()] + ' ' + mon.getDate() + ' ' + M[mon.getMonth()] + ' – ' + DOW[sun.getDay()] + ' ' + sun.getDate() + ' ' + M[sun.getMonth()];
+}
+function renderRotaPanel() {
+  const body = $('#rotaPrintBody'); if (!body) return;
+  const lbl = $('#rotaPanelWeek'); if (lbl) lbl.textContent = weekSpanLabel(state.week);
+  body.replaceChildren();
+  const assigned = rotaFor(state.week);
+  const pm = patternById();
+  const staff = activeStaff();
+  if (!staff.length) { body.append(el('p', { className: 'muted' }, 'No active staff.')); return; }
+  const table = el('div', { className: 'roster' });
+  staff.forEach(s => {
+    const pid = assigned[s.staff_id] || 'off';
+    const p = pm[pid];
+    const isOff = pid === 'off' || !p;
+    table.append(el('div', { className: 'roster-row' + (isOff ? ' off' : '') },
+      el('span', { className: 'r-name' }, s.name || s.staff_id),
+      el('span', { className: 'r-role' }, s.role || ''),
+      el('span', { className: 'r-pat' }, isOff ? 'Off' : shortPatternLabel(p)),
+      el('span', { className: 'r-time' }, isOff ? '—' : (fmtRange(p) || '—'))));
+  });
+  body.append(table);
 }
 async function saveRota() {
   const assignments = $$('#rotaList select').map(sel => ({ staff_id: sel.dataset.staff, pattern_id: sel.value }));
@@ -142,7 +191,7 @@ function conditionBuilder(initialStr) {
         renderVal(cl && cl.sub === sub.value ? cl : null);
         sub.onchange = () => renderVal(null);
       } else {
-        const dogs = (state.data.riskDogs || []).map(d => ({ v: d.dog_name, label: d.dog_name }));
+        const dogs = (state.data.riskDogs || []).filter(d => String(d.active || 'y').toLowerCase() !== 'n').map(d => ({ v: d.dog_name, label: d.dog_name }));
         const v = dogs.length ? mkSelect(dogs, cl ? cl.val : '') : el('input', { placeholder: 'Add a dog in the Risk Dogs tab first', value: cl ? cl.val : '' });
         obj.ctrls.val = v; paramWrap.append(v);
       }
@@ -194,8 +243,9 @@ function parseDays(spec) {
   });
   return out;
 }
-function remCard(r) {
+function remCard(r, archived) {
   r = r || { reminder_id: '', title: '', message: '', time: '', days: 'Mon-Fri', condition: '', requires_done: 'n', done_window_mins: '30', active: 'y' };
+  archived = !!archived;
   const title = el('input', { value: r.title || '', placeholder: 'e.g. Lunchtime medication check' });
   const msg = el('textarea', { value: r.message || '', placeholder: 'Message sent to staff', rows: 2 });
   const time = el('input', { type: 'time', value: r.time || '' });
@@ -204,35 +254,51 @@ function remCard(r) {
   const sel = new Set(parseDays(r.days)); const boxes = {};
   DAYS.forEach(d => { const cb = el('input', { type: 'checkbox', checked: sel.has(d) }); boxes[d] = cb; dayWrap.append(el('label', { className: 'chip' }, cb, d)); });
   const reqd = el('input', { type: 'checkbox', checked: String(r.requires_done).toLowerCase() === 'y' });
-  const act = el('input', { type: 'checkbox', checked: String(r.active).toLowerCase() === 'y' });
   const cond = conditionBuilder(r.condition || '');
-  const save = el('button', { className: 'primary small' }, 'Save');
-  save.onclick = async () => {
+  // Read this card's live on-screen values (shared by Save / Archive / Duplicate).
+  function collect() {
     const days = DAYS.filter(d => boxes[d].checked).join(',');
-    const payload = { reminder_id: r.reminder_id, title: title.value.trim(), message: msg.value.trim(), time: time.value, days, condition: cond.serialize(), requires_done: reqd.checked ? 'y' : 'n', done_window_mins: String(dwin.value || '30'), active: act.checked ? 'y' : 'n' };
+    return { reminder_id: r.reminder_id, title: title.value.trim(), message: msg.value.trim(), time: time.value, days, condition: cond.serialize(), requires_done: reqd.checked ? 'y' : 'n', done_window_mins: String(dwin.value || '30') };
+  }
+  async function save(activeVal, btn) {
+    const payload = collect(); payload.active = activeVal;
     if (!payload.title || !payload.time) { toast('Title and time are required', true); return; }
-    save.disabled = true;
+    btn.disabled = true;
     try { const res = await api('saveReminder', payload); if (res.ok) { toast('Reminder saved'); await refresh(); } else toast('Save failed', true); }
     catch (e) { if (e.message !== 'unauthorized') toast('Save failed', true); }
-    finally { save.disabled = false; }
-  };
-  return el('div', { className: 'card rem' },
+    finally { btn.disabled = false; }
+  }
+  const saveBtn = el('button', { className: 'primary small' }, 'Save');
+  const dup = el('button', { className: 'ghost small', title: 'Make a copy to tweak' }, 'Duplicate');
+  const arch = el('button', { className: 'ghost small' }, archived ? 'Restore' : 'Archive');
+  const card = el('div', { className: 'card rem' },
     el('div', { className: 'rem-grid' }, field('Title', title), field('Time', time), field('Done window (mins)', dwin)),
     field('Message', msg),
     el('div', { className: 'rem-row' },
       el('div', null, el('div', { className: 'lbl' }, 'Days'), dayWrap),
-      el('label', { className: 'switch' }, reqd, el('span', null, 'Requires "Done"')),
-      el('label', { className: 'switch' }, act, el('span', null, 'Active'))),
+      el('label', { className: 'switch' }, reqd, el('span', null, 'Requires "Done"'))),
     cond.wrap,
-    el('div', { className: 'row spread' }, el('span', { className: 'muted small' }, r.reminder_id || '(new)'), save)
+    el('div', { className: 'row spread' }, el('span', { className: 'muted small' }, r.reminder_id || '(new)'), el('div', { className: 'row' }, dup, arch, saveBtn))
   );
+  saveBtn.onclick = () => save(archived ? 'n' : 'y', saveBtn);
+  arch.onclick = () => save(archived ? 'y' : 'n', arch);
+  dup.onclick = () => { const copy = collect(); copy.reminder_id = ''; card.after(remCard(copy, false)); toast('Duplicated — change the time and Save'); };
+  return card;
 }
 function renderReminders() {
   renderSyncStatus();
   const wrap = $('#remList'); wrap.innerHTML = '';
   const list = state.data.reminders || [];
-  if (!list.length) { wrap.append(el('p', { className: 'muted' }, 'No reminders yet — add one.')); return; }
-  list.forEach(r => wrap.append(remCard(r)));
+  const live = list.filter(r => String(r.active).toLowerCase() === 'y');
+  const arch = list.filter(r => String(r.active).toLowerCase() !== 'y');
+  if (!live.length && !arch.length) { wrap.append(el('p', { className: 'muted' }, 'No reminders yet — add one.')); return; }
+  if (!live.length) wrap.append(el('p', { className: 'muted' }, 'No active reminders — add one or restore an archived one.'));
+  else live.forEach(r => wrap.append(remCard(r, false)));
+  if (arch.length) {
+    const inner = el('div', { className: 'list' });
+    arch.forEach(r => inner.append(remCard(r, true)));
+    wrap.append(el('details', { className: 'archived' }, el('summary', null, 'Show archived (' + arch.length + ')'), inner));
+  }
 }
 // Distinct HH:MM of active reminders — what the engine schedule should fire at.
 function distinctActiveTimes() {
@@ -293,33 +359,49 @@ function staffCard(s) {
 function renderStaff() { const wrap = $('#staffList'); wrap.innerHTML = ''; (state.data.staff || []).forEach(s => wrap.append(staffCard(s))); }
 
 // ---------- Risk Dogs ----------
-function riskCard(d) {
-  d = d || { dog_name: '', in_today: 'n', risk_notes: '' };
+function riskCard(d, archived) {
+  d = d || { dog_name: '', in_today: 'n', risk_notes: '', active: 'y' };
+  archived = !!archived;
   const isNew = !d.dog_name;
   const name = el('input', { value: d.dog_name || '', placeholder: 'Dog name (e.g. Bella)' });
   if (!isNew) name.disabled = true; // name is the key; rename = add new
   const inToday = el('input', { type: 'checkbox', checked: String(d.in_today).toLowerCase() === 'y' });
   const notes = el('textarea', { value: d.risk_notes || '', rows: 2, placeholder: 'Risk notes (e.g. muzzle before group play)' });
-  const save = el('button', { className: 'primary small' }, 'Save');
-  save.onclick = async () => {
-    const dn = name.value.trim(); if (!dn) { toast('Dog name required', true); return; }
-    save.disabled = true;
-    try { const r = await api('saveRiskDog', { dog_name: dn, in_today: inToday.checked ? 'y' : 'n', risk_notes: notes.value.trim() }); if (r.ok) { toast('Risk dog saved'); await refresh(); } else toast('Save failed', true); }
+  function collect() { return { dog_name: name.value.trim(), in_today: inToday.checked ? 'y' : 'n', risk_notes: notes.value.trim() }; }
+  async function save(payload, btn) {
+    if (!payload.dog_name) { toast('Dog name required', true); return; }
+    btn.disabled = true;
+    try { const r = await api('saveRiskDog', payload); if (r.ok) { toast('Risk dog saved'); await refresh(); } else toast('Save failed', true); }
     catch (e) { if (e.message !== 'unauthorized') toast('Save failed', true); }
-    finally { save.disabled = false; }
-  };
-  return el('div', { className: 'card' },
+    finally { btn.disabled = false; }
+  }
+  const saveBtn = el('button', { className: 'primary small' }, 'Save');
+  const dup = el('button', { className: 'ghost small', title: 'Copy notes to a new dog' }, 'Duplicate');
+  const arch = el('button', { className: 'ghost small' }, archived ? 'Restore' : 'Archive');
+  const card = el('div', { className: 'card' },
     field('Dog name', name),
     el('div', { className: 'rem-row' }, el('label', { className: 'switch' }, inToday, el('span', null, 'In today')), el('span', { className: 'muted small' }, 'Use condition dog:' + (d.dog_name || '<name>') + ' on a reminder')),
     field('Risk notes', notes),
-    el('div', { className: 'row spread' }, el('span', { className: 'muted small' }, isNew ? '(new)' : d.dog_name), save)
+    el('div', { className: 'row spread' }, el('span', { className: 'muted small' }, isNew ? '(new)' : d.dog_name), el('div', { className: 'row' }, dup, arch, saveBtn))
   );
+  saveBtn.onclick = () => { const p = collect(); p.active = archived ? 'n' : 'y'; save(p, saveBtn); };
+  arch.onclick = () => { const p = collect(); if (archived) { p.active = 'y'; } else { p.active = 'n'; p.in_today = 'n'; } save(p, arch); };
+  dup.onclick = () => { const c = collect(); card.after(riskCard({ dog_name: '', in_today: c.in_today, risk_notes: c.risk_notes, active: 'y' }, false)); toast('Duplicated — enter a new name and Save'); };
+  return card;
 }
 function renderRiskDogs() {
   const wrap = $('#riskList'); wrap.innerHTML = '';
   const list = state.data.riskDogs || [];
-  if (!list.length) { wrap.append(el('p', { className: 'muted' }, 'No risk dogs yet — add one.')); return; }
-  list.forEach(d => wrap.append(riskCard(d)));
+  const vis = list.filter(d => String(d.active || 'y').toLowerCase() !== 'n');
+  const arch = list.filter(d => String(d.active || 'y').toLowerCase() === 'n');
+  if (!vis.length && !arch.length) { wrap.append(el('p', { className: 'muted' }, 'No risk dogs yet — add one.')); return; }
+  if (!vis.length) wrap.append(el('p', { className: 'muted' }, 'No active risk dogs — add one or restore an archived one.'));
+  else vis.forEach(d => wrap.append(riskCard(d, false)));
+  if (arch.length) {
+    const inner = el('div', { className: 'list' });
+    arch.forEach(d => inner.append(riskCard(d, true)));
+    wrap.append(el('details', { className: 'archived' }, el('summary', null, 'Show archived (' + arch.length + ')'), inner));
+  }
 }
 
 // ---------- chrome ----------
@@ -341,9 +423,11 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#addRem').onclick = () => $('#remList').prepend(remCard());
   $('#syncSched').onclick = syncSchedule;
   $('#addRisk').onclick = () => $('#riskList').prepend(riskCard());
-  $('#weekPrev').onclick = () => shiftWeek(-7);
-  $('#weekNext').onclick = () => shiftWeek(7);
-  $('#week').onchange = () => setWeek(ymd(mondayOf($('#week').value + 'T12:00:00')));
+  $('#weekPrev').onclick = () => { if (guardLeaveWeek()) shiftWeek(-7); };
+  $('#weekNext').onclick = () => { if (guardLeaveWeek()) shiftWeek(7); };
+  $('#week').onchange = () => { if (guardLeaveWeek()) setWeek(ymd(mondayOf($('#week').value + 'T12:00:00'))); else $('#week').value = state.week; };
+  $('#printRota').onclick = () => window.print();
+  window.addEventListener('beforeunload', e => { if (state.data && rotaDirty()) { e.preventDefault(); e.returnValue = ''; } });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
   if (state.token) boot(); else showGate();
 });
