@@ -365,28 +365,52 @@ async function syncSchedule() {
 }
 
 // ---------- Staff ----------
-function staffCard(s) {
+function staffCard(s, archived) {
+  s = s || { staff_id: '', name: '', role: ROLES[0], active: 'y', telegram_chat_id: '' };
+  archived = !!archived;
+  const isNew = !s.staff_id;
+  const sid = el('input', { value: s.staff_id || '', placeholder: 'e.g. core_c (lowercase, no spaces)' });
+  if (!isNew) sid.disabled = true; // staff_id is the key; rename = add new
   const name = el('input', { value: s.name || '' });
-  const role = el('select', null); ROLES.forEach(R => { const o = el('option', { value: R }, R); if (s.role === R) o.selected = true; role.append(o); });
-  const act = el('input', { type: 'checkbox', checked: String(s.active).toLowerCase() === 'y' });
+  const role = el('select', null); ROLES.forEach(R => { const o = el('option', { value: R }, R); if ((s.role || ROLES[0]) === R) o.selected = true; role.append(o); });
   const onboarded = String(s.telegram_chat_id || '').trim() !== '';
-  const link = 'https://t.me/' + BOT + '?start=' + s.staff_id;
-  const copy = el('button', { className: 'ghost small' }, 'Copy onboarding link');
-  copy.onclick = () => { navigator.clipboard.writeText(link).then(() => toast('Onboarding link copied')); };
-  const save = el('button', { className: 'primary small' }, 'Save');
-  save.onclick = async () => {
-    save.disabled = true;
-    try { const r = await api('saveStaff', { staff_id: s.staff_id, name: name.value.trim(), role: role.value, active: act.checked ? 'y' : 'n' }); if (r.ok) { toast('Staff saved'); await refresh(); } else toast('Save failed', true); }
+  function collect() { return { staff_id: isNew ? sid.value.trim() : s.staff_id, name: name.value.trim(), role: role.value }; }
+  async function save(activeVal, btn) {
+    const p = collect(); p.active = activeVal;
+    if (!p.staff_id) { toast('Staff ID is required', true); return; }
+    if (isNew && !/^[a-z0-9_]+$/.test(p.staff_id)) { toast('Staff ID: lowercase letters, numbers and underscores only', true); return; }
+    btn.disabled = true;
+    try { const r = await api('saveStaff', p); if (r.ok) { toast('Staff saved'); await refresh(); } else toast('Save failed', true); }
     catch (e) { if (e.message !== 'unauthorized') toast('Save failed', true); }
-    finally { save.disabled = false; }
-  };
+    finally { btn.disabled = false; }
+  }
+  const saveBtn = el('button', { className: 'primary small' }, 'Save');
+  const arch = el('button', { className: 'ghost small' }, archived ? 'Restore' : 'Archive');
+  const copy = isNew ? null : el('button', { className: 'ghost small' }, 'Copy onboarding link');
+  if (copy) copy.onclick = () => { navigator.clipboard.writeText('https://t.me/' + BOT + '?start=' + s.staff_id).then(() => toast('Onboarding link copied')); };
+  saveBtn.onclick = () => save(archived ? 'n' : 'y', saveBtn);
+  arch.onclick = () => save(archived ? 'y' : 'n', arch);
   return el('div', { className: 'card staff' },
-    el('div', { className: 'row spread' }, el('strong', null, s.staff_id), el('span', { className: 'badge ' + (onboarded ? 'on' : 'off') }, onboarded ? 'Onboarded' : 'Not onboarded')),
+    el('div', { className: 'row spread' }, el('strong', null, isNew ? '(new staff)' : s.staff_id), el('span', { className: 'badge ' + (onboarded ? 'on' : 'off') }, onboarded ? 'Onboarded' : 'Not onboarded')),
+    isNew ? field('Staff ID', sid) : null,
     el('div', { className: 'rem-grid' }, field('Name', name), field('Role', role)),
-    el('div', { className: 'row spread' }, el('label', { className: 'switch' }, act, el('span', null, 'Active')), el('div', { className: 'row' }, copy, save))
+    el('div', { className: 'row spread' }, el('span', { className: 'muted small' }, archived ? 'Archived — off the rota' : ''), el('div', { className: 'row' }, copy, arch, saveBtn))
   );
 }
-function renderStaff() { const wrap = $('#staffList'); wrap.innerHTML = ''; (state.data.staff || []).forEach(s => wrap.append(staffCard(s))); }
+function renderStaff() {
+  const wrap = $('#staffList'); wrap.innerHTML = '';
+  const list = state.data.staff || [];
+  const active = list.filter(s => String(s.active).toLowerCase() === 'y');
+  const arch = list.filter(s => String(s.active).toLowerCase() !== 'y');
+  if (!active.length && !arch.length) { wrap.append(el('p', { className: 'muted' }, 'No staff yet — add one.')); return; }
+  if (!active.length) wrap.append(el('p', { className: 'muted' }, 'No active staff — add one or restore an archived one.'));
+  else active.forEach(s => wrap.append(staffCard(s, false)));
+  if (arch.length) {
+    const inner = el('div', { className: 'list' });
+    arch.forEach(s => inner.append(staffCard(s, true)));
+    wrap.append(el('details', { className: 'archived' }, el('summary', null, 'Show archived (' + arch.length + ')'), inner));
+  }
+}
 
 // ---------- Risk Dogs ----------
 function riskCard(d, archived) {
@@ -451,6 +475,7 @@ window.addEventListener('DOMContentLoaded', () => {
   $('#signout').onclick = () => signOut();
   $('#saveRota').onclick = saveRota;
   $('#addRem').onclick = () => $('#remList').prepend(remCard());
+  $('#addStaff').onclick = () => $('#staffList').prepend(staffCard());
   $('#syncSched').onclick = syncSchedule;
   $('#addRisk').onclick = () => $('#riskList').prepend(riskCard());
   $('#weekPrev').onclick = () => { if (guardLeaveWeek()) shiftWeek(-7); };
